@@ -9,12 +9,13 @@ services:
       - "8000:8000"
     volumes:
       - ./datas/cairn/:/root/.local/share/cairn/
+    env_file:
+      - .env
+    environment:
+      CAIRN_USER: ${CAIRN_USER:-}
+      CAIRN_PASS: ${CAIRN_PASS:-}
     healthcheck:
-      test:
-        - "CMD"
-        - "python"
-        - "-c"
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/projects', timeout=5)"
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -30,6 +31,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dispatch.yaml:/cairn/dispatch.yaml
+    env_file:
+      - .env
+    environment:
+      CAIRN_USER: ${CAIRN_USER:-}
+      CAIRN_PASS: ${CAIRN_PASS:-}
     depends_on:
       cairn-server:
         condition: service_healthy

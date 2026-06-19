@@ -52,9 +52,11 @@ RUN sudo npm install -g @mariozechner/pi-coding-agent@0.73.0
 #  See docs/vnc-remote-desktop.md for full design rationale.
 #  Packages: supervisor (process mgmt), xvfb (virtual framebuffer),
 #            x11vnc (VNC server), novnc + websockify (Web VNC client),
-#            fluxbox (window manager), chromium (desktop browser)
+#            fluxbox (window manager), chromium (desktop browser),
+#            nginx + apache2-utils (HTTP Basic Auth for noVNC web)
 RUN sudo apt update && \
-    sudo apt install -y supervisor xvfb x11vnc novnc websockify fluxbox chromium && \
+    sudo apt install -y supervisor xvfb x11vnc novnc websockify fluxbox chromium \
+    nginx apache2-utils && \
     sudo apt clean && \
     sudo rm -rf /var/lib/apt/lists/*
 
@@ -65,6 +67,8 @@ ENV DISPLAY=:99
 ENV CHROMIUM_USER_DATA_DIR=/home/kali/.config/chromium-vnc
 ENV CDP_PORT=9222
 ENV NOVNC_PORT=6080
+ENV VNC_USER=gumingyao_sx@qiyi.com
+ENV VNC_PASS=GMY895604@!
 
 # ── System cleanup ───────────────────────────────────────────────────────────
 RUN sudo rm -rf /usr/lib/llvm-*/build && \

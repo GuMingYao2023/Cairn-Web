@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from cairn import __version__
 from cairn.server import db
+from cairn.server.auth import AuthMiddleware
 from cairn.server.routers import export, hints, intents, projects, settings
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -24,6 +25,17 @@ app = FastAPI(
     version=__version__,
     lifespan=lifespan,
 )
+
+# ── HTTP Basic Auth ─────────────────────────────────────────────────────
+#  Set CAIRN_USER / CAIRN_PASS env vars to enable; leave unset for dev.
+app.add_middleware(AuthMiddleware)
+
+
+@app.get("/health", include_in_schema=False)
+def health():
+    """Unauthenticated healthcheck used by docker-compose."""
+    return {"status": "ok"}
+
 
 app.include_router(settings.router)
 app.include_router(projects.router)

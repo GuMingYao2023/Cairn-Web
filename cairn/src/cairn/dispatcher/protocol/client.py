@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 import logging
+import os
 import threading
 
 from pydantic import TypeAdapter
@@ -36,6 +37,11 @@ class CairnClient:
     def __init__(self, base_url: str, timeout: float = 10.0):
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self._auth: tuple[str, str] | None = (
+            (os.environ["CAIRN_USER"], os.environ["CAIRN_PASS"])
+            if os.environ.get("CAIRN_USER") and os.environ.get("CAIRN_PASS")
+            else None
+        )
         self._summary_adapter = TypeAdapter(list[ProjectSummary])
         self._local = threading.local()
         self._sessions: dict[int, requests.Session] = {}
@@ -153,6 +159,8 @@ class CairnClient:
             return session
 
         session = requests.Session()
+        if self._auth is not None:
+            session.auth = self._auth
         adapter = HTTPAdapter(pool_connections=64, pool_maxsize=64, pool_block=False)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
