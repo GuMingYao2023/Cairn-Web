@@ -269,6 +269,10 @@
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         New Project
       </button>
+      <button @click="loadWorkers(); showWorkers = true" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg>
+        Workers
+      </button>
     </div>
     <div class="flex items-center gap-1.5 ml-1">
       <button @click="showLocalPrefs = true" class="h-7 max-w-40 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center shrink-0">
@@ -985,6 +989,216 @@
   </div>
 </div>
 
+<!-- Workers Management -->
+<div x-show="showWorkers" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="closeWorkers()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-slate-200/60 relative max-h-[85vh] flex flex-col" @click.stop>
+
+    <!-- ── Header ── -->
+    <div class="flex items-center justify-between mb-4 shrink-0">
+      <h3 class="text-base font-semibold text-slate-700">
+        <span x-text="showWorkerForm ? (isEditingWorker ? 'Edit Worker' : 'Add Worker') : 'Worker Configurations'"></span>
+      </h3>
+      <button @click="closeWorkers()" class="h-7 w-7 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition inline-flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- ── Worker List View ── -->
+    <template x-if="!showWorkerForm">
+      <div class="flex flex-col flex-1 min-h-0">
+        <template x-if="workers.length === 0">
+          <div class="flex-1 flex flex-col items-center justify-center text-slate-400 py-16">
+            <p class="text-sm text-slate-500">No workers configured yet.</p>
+            <p class="text-xs mt-1">Add one to get started, or edit your dispatch.yaml directly.</p>
+          </div>
+        </template>
+        <template x-if="workers.length > 0">
+          <div class="flex-1 overflow-y-auto space-y-2 pr-1">
+            <template x-for="w in workers" :key="w.id">
+              <div class="border border-slate-200 rounded-xl p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="font-medium text-sm text-slate-700 truncate" x-text="w.name"></span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium uppercase tracking-wider"
+                        :class="w.type === 'claudecode' ? 'bg-indigo-50 text-indigo-600' : w.type === 'codex' ? 'bg-emerald-50 text-emerald-600' : w.type === 'pi' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'"
+                        x-text="w.type"></span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+                      <span x-text="'Tasks: ' + (w.task_types || []).join(', ')"></span>
+                      <span>·</span>
+                      <span x-text="'Max: ' + w.max_running"></span>
+                      <span>·</span>
+                      <span x-text="'Priority: ' + w.priority"></span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button @click="openEditWorker(w)" class="h-7 px-2 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition">
+                      <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M16.862 3.487a2.25 2.25 0 1 1 3.182 3.182L7.5 19.313l-4.5.688.687-4.5L16.862 3.487z"/></svg>
+                    </button>
+                    <button @click="testWorkerConnection(w)" title="Test Connection" class="h-7 px-2 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition">
+                      <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+                    </button>
+                    <button @click="showDeleteWorker = true; deleteWorkerId = w.id; deleteWorkerName = w.name" class="h-7 px-2 rounded-lg border border-slate-200 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition">
+                      <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6m-7.25 5.5v5m4.5-5v5M19 6l-.63 11.338A2 2 0 0 1 16.37 19.5H7.63a2 2 0 0 1-1.997-2.162L5 6"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <!-- env keys summary -->
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  <template x-for="(v, k) in w.env" :key="k">
+                    <span class="text-[10px] px-1.5 py-0.5 bg-slate-50 text-slate-400 rounded" x-text="k + ': ' + (k.toLowerCase().includes('token') || k.toLowerCase().includes('key') ? '••••' : v)"></span>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+        <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-100 shrink-0">
+          <button @click="openAddWorker()" class="px-3 py-1.5 text-sm border border-brand-200 text-brand-600 hover:bg-brand-50 rounded-xl transition flex items-center gap-1.5 font-medium">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Add Worker
+          </button>
+          <button @click="showWorkers = false" class="px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
+        </div>
+      </div>
+    </template>
+
+    <!-- ── Worker Form View ── -->
+    <template x-if="showWorkerForm">
+      <div class="flex flex-col flex-1 min-h-0 overflow-y-auto pr-1">
+        <div>
+          <label class="text-[11px] text-slate-400 mb-1 block font-medium">Name</label>
+          <input type="text" x-model="workerForm.name" placeholder="my-worker" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300">
+        </div>
+        <div class="mt-3">
+          <label class="text-[11px] text-slate-400 mb-1 block font-medium">Type</label>
+          <select x-model="workerForm.type" @change="onWorkerTypeChange()" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition bg-white">
+            <option value="claudecode">claudecode (Anthropic)</option>
+            <option value="codex">codex (OpenAI)</option>
+            <option value="pi">pi (OpenAI-compatible)</option>
+            <option value="mock">mock (no API)</option>
+          </select>
+        </div>
+        <div class="mt-3">
+          <label class="text-[11px] text-slate-400 mb-1 block font-medium">Task Types</label>
+          <div class="flex flex-wrap gap-3">
+            <label class="flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer">
+              <input type="checkbox" value="reason" x-model="workerForm.task_types" class="rounded border-slate-300 text-brand-500 focus:ring-brand-200">
+              reason
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer">
+              <input type="checkbox" value="explore" x-model="workerForm.task_types" class="rounded border-slate-300 text-brand-500 focus:ring-brand-200">
+              explore
+            </label>
+            <label class="flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer">
+              <input type="checkbox" value="bootstrap" x-model="workerForm.task_types" class="rounded border-slate-300 text-brand-500 focus:ring-brand-200">
+              bootstrap
+            </label>
+          </div>
+        </div>
+        <div class="mt-3 flex gap-4">
+          <div class="flex-1">
+            <label class="text-[11px] text-slate-400 mb-1 block font-medium">Max Running</label>
+            <input type="number" min="1" x-model.number="workerForm.max_running" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+          </div>
+          <div class="flex-1">
+            <label class="text-[11px] text-slate-400 mb-1 block font-medium">Priority</label>
+            <input type="number" min="0" x-model.number="workerForm.priority" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
+          </div>
+        </div>
+        <template x-if="workerForm.type !== 'mock'">
+          <div class="mt-4">
+            <label class="text-[11px] text-slate-400 mb-1.5 block font-medium">Environment Variables</label>
+            <div class="border border-slate-200 rounded-xl p-3 space-y-3 bg-slate-50/50">
+              <template x-for="field in getEnvFields()" :key="field.key">
+                <div>
+                  <label class="text-[11px] text-slate-500 mb-0.5 block font-medium" x-text="field.label"></label>
+                  <div class="relative">
+                    <input :type="field.type === 'password' && !showApiKey[field.key] ? 'password' : 'text'"
+                      x-model="workerForm.env[field.key]"
+                      :placeholder="field.placeholder || ''"
+                      class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300 bg-white pr-9">
+                    <template x-if="field.type === 'password'">
+                      <button @click="showApiKey[field.key] = !showApiKey[field.key]; $el.closest('.relative').querySelector('input').type = showApiKey[field.key] ? 'text' : 'password'"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                          <path d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88"/>
+                        </svg>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        <template x-if="workerForm.type === 'mock'">
+          <div class="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-400">
+            Mock workers don't need environment variables — they simulate responses locally.
+          </div>
+        </template>
+
+        <!-- Test Connection Result -->
+        <template x-if="testConnectionResult">
+          <div class="mt-3 p-2.5 rounded-xl text-sm flex items-center gap-2"
+            :class="testConnectionResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'">
+            <template x-if="testConnectionResult.success">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4.5 12.75l6 6 9-13.5"/></svg>
+            </template>
+            <template x-if="!testConnectionResult.success">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+            </template>
+            <span x-text="testConnectionResult.message"></span>
+          </div>
+        </template>
+
+        <!-- Actions -->
+        <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-100 shrink-0">
+          <button @click="testConnectionFromForm()" :disabled="testingConnection"
+            class="px-3 py-1.5 text-sm border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-xl transition inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+            <template x-if="!testingConnection">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+            </template>
+            <template x-if="testingConnection">
+              <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            </template>
+            <span x-text="testingConnection ? 'Testing...' : 'Test Connection'"></span>
+          </button>
+          <div class="flex items-center gap-2">
+            <button @click="closeWorkerForm()" class="px-4 py-1.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+            <button @click="saveWorker()" class="px-5 py-1.5 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200"
+              :disabled="!workerForm.name.trim()">Save Worker</button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+<!-- Delete Worker -->
+<div x-show="showDeleteWorker" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showDeleteWorker = false">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200/60" @click.stop>
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6"/><path d="M19 6l-.63 11.338A2 2 0 0 1 16.37 19.5H7.63a2 2 0 0 1-1.997-2.162L5 6"/><path d="M10 10.5v5"/><path d="M14 10.5v5"/></svg>
+      </div>
+      <div class="min-w-0 flex-1">
+        <h3 class="text-base font-semibold text-slate-700">Delete Worker</h3>
+        <p class="text-sm text-slate-500 mt-1 leading-relaxed">
+          This will permanently remove
+          <span class="font-medium text-slate-700" x-text="deleteWorkerName"></span>.
+        </p>
+        <p class="text-xs text-slate-400 mt-3">This action cannot be undone.</p>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-6">
+      <button @click="showDeleteWorker = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+      <button @click="confirmDeleteWorker()" class="px-4 py-2 text-sm bg-rose-500 text-white rounded-xl font-medium hover:bg-rose-600 transition shadow-sm shadow-rose-200">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- Settings -->
 <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showSettings = false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-slate-200/60" @click.stop>
@@ -1101,6 +1315,27 @@ function cairnApp() {
     exportProjectId: '',
     showDeleteModal: false,
 
+    showWorkers: false,
+    showWorkerForm: false,
+    isEditingWorker: false,
+    editingWorkerId: null,
+    workers: [],
+    workerForm: {
+      name: '',
+      type: 'claudecode',
+      task_types: ['explore'],
+      max_running: 1,
+      priority: 0,
+      env: {},
+    },
+    testingConnection: false,
+    testConnectionResult: null,
+    showDeleteWorker: false,
+    deleteWorkerId: null,
+    deleteWorkerName: '',
+    showApiKey: {},
+    workerEnvBuffer: {},
+
     newProject: { title: '', origin: '', goal: '', bootstrap: true, hints: [{ content: '' }] },
     intentForm: { description: '' },
     concludeForm: { description: '', intentId: '' },
@@ -1162,7 +1397,8 @@ function cairnApp() {
     async api(method, path, body) {
       const opts = { method, headers: { 'Content-Type': 'application/json' } };
       if (body) opts.body = JSON.stringify(body);
-      const r = await fetch(path, opts);
+      const url = window.location.origin + path;
+      const r = await fetch(url, opts);
       if (r.status === 204) return null;
       const data = await r.json();
       if (!r.ok) {
@@ -1175,7 +1411,7 @@ function cairnApp() {
     },
 
     async fetchText(path) {
-      const r = await fetch(path);
+      const r = await fetch(window.location.origin + path);
       const text = await r.text();
       if (!r.ok) {
         let detail = text;
@@ -3377,6 +3613,144 @@ function cairnApp() {
         await this.loadProject(this.selectedProjectId);
         this.sideTab = 'hints';
         this.showToast('Hint added');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    // ── Worker Methods ────────────────────────────────────────────
+
+    closeWorkers() {
+      this.showWorkers = false;
+      this.showWorkerForm = false;
+      this.isEditingWorker = false;
+      this.editingWorkerId = null;
+      this.testConnectionResult = null;
+      this.showDeleteWorker = false;
+    },
+
+    async loadWorkers() {
+      try { this.workers = await this.api('GET', '/workers'); }
+      catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    openAddWorker() {
+      this.isEditingWorker = false;
+      this.editingWorkerId = null;
+      this.workerForm = { name: '', type: 'claudecode', task_types: ['explore'], max_running: 1, priority: 0, env: {} };
+      this.showWorkerForm = true;
+      this.testConnectionResult = null;
+    },
+
+    openEditWorker(w) {
+      this.isEditingWorker = true;
+      this.editingWorkerId = w.id;
+      this.workerForm = {
+        name: w.name,
+        type: w.type,
+        task_types: [...(w.task_types || [])],
+        max_running: w.max_running,
+        priority: w.priority,
+        env: { ...(w.env || {}) },
+      };
+      this.showWorkerForm = true;
+      this.testConnectionResult = null;
+    },
+
+    closeWorkerForm() {
+      this.showWorkerForm = false;
+      this.isEditingWorker = false;
+      this.editingWorkerId = null;
+      this.testConnectionResult = null;
+    },
+
+    getEnvFields() {
+      const FIELDS = {
+        claudecode: [
+          { key: 'ANTHROPIC_MODEL', label: 'Model', type: 'text', placeholder: 'claude-sonnet-4-20250514' },
+          { key: 'ANTHROPIC_BASE_URL', label: 'Base URL', type: 'text', placeholder: 'https://api.anthropic.com' },
+          { key: 'ANTHROPIC_AUTH_TOKEN', label: 'API Key', type: 'password', placeholder: 'sk-ant-...' },
+        ],
+        codex: [
+          { key: 'CODEX_MODEL', label: 'Model', type: 'text', placeholder: 'gpt-4o' },
+          { key: 'CODEX_BASE_URL', label: 'Base URL', type: 'text', placeholder: 'https://api.openai.com' },
+          { key: 'OPENAI_API_KEY', label: 'API Key', type: 'password', placeholder: 'sk-...' },
+        ],
+        pi: [
+          { key: 'PI_MODEL', label: 'Model', type: 'text', placeholder: 'claude-sonnet-4-20250514' },
+          { key: 'PI_BASE_URL', label: 'Base URL', type: 'text', placeholder: 'https://api.anthropic.com' },
+          { key: 'PI_API_KEY', label: 'API Key', type: 'password', placeholder: '' },
+          { key: 'PI_PROVIDER_API', label: 'Provider API', type: 'text', placeholder: 'anthropic' },
+        ],
+        mock: [],
+      };
+      return FIELDS[this.workerForm.type] || [];
+    },
+
+    onWorkerTypeChange() {
+      // Preserve env values that share keys across types
+      const kept = {};
+      for (const field of this.getEnvFields()) {
+        if (this.workerForm.env[field.key]) {
+          kept[field.key] = this.workerForm.env[field.key];
+        }
+      }
+      this.workerForm.env = kept;
+      this.testConnectionResult = null;
+    },
+
+    async saveWorker() {
+      if (!this.workerForm.name.trim()) { this.showToast('Name is required', 'error'); return; }
+      try {
+        const payload = {
+          name: this.workerForm.name.trim(),
+          type: this.workerForm.type,
+          task_types: this.workerForm.task_types,
+          max_running: this.workerForm.max_running || 1,
+          priority: this.workerForm.priority || 0,
+          env: this.workerForm.env,
+        };
+        if (this.isEditingWorker) {
+          await this.api('PUT', '/workers/' + this.editingWorkerId, payload);
+          this.showToast('Worker updated', 'info');
+        } else {
+          await this.api('POST', '/workers', payload);
+          this.showToast('Worker created', 'info');
+        }
+        this.closeWorkerForm();
+        await this.loadWorkers();
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async confirmDeleteWorker() {
+      if (!this.deleteWorkerId) return;
+      try {
+        await this.api('DELETE', '/workers/' + this.deleteWorkerId);
+        this.showDeleteWorker = false;
+        this.deleteWorkerId = null;
+        this.deleteWorkerName = '';
+        this.showToast('Worker deleted', 'info');
+        await this.loadWorkers();
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async testConnectionFromForm() {
+      this.testingConnection = true;
+      this.testConnectionResult = null;
+      try {
+        this.testConnectionResult = await this.api('POST', '/workers/test-connection', {
+          type: this.workerForm.type,
+          env: this.workerForm.env,
+        });
+      } catch(e) {
+        this.testConnectionResult = { success: false, message: e.message };
+      } finally { this.testingConnection = false; }
+    },
+
+    async testWorkerConnection(w) {
+      try {
+        const result = await this.api('POST', '/workers/test-connection', {
+          type: w.type, env: w.env,
+        });
+        this.showToast(result.message, result.success ? 'info' : 'error');
       } catch(e) { this.showToast(e.message, 'error'); }
     },
 

@@ -72,12 +72,25 @@ CREATE TABLE IF NOT EXISTS counters (
 );
 
 INSERT OR IGNORE INTO counters (name, value) VALUES ('project', 0);
+INSERT OR IGNORE INTO counters (name, value) VALUES ('worker', 0);
 
 CREATE TABLE IF NOT EXISTS scoped_counters (
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     kind TEXT NOT NULL,
     value INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (project_id, kind)
+);
+
+CREATE TABLE IF NOT EXISTS workers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL,
+    task_types TEXT NOT NULL,
+    max_running INTEGER NOT NULL DEFAULT 1,
+    priority INTEGER NOT NULL DEFAULT 0,
+    env TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 """
 
