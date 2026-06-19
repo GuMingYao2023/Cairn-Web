@@ -19,6 +19,7 @@ def _loop() -> DispatcherLoop:
     loop._cleanup_pending = set()
     loop._inactive_cleanup_done = {}
     loop.worker_unhealthy_until = {}
+    loop.startup_unhealthy_workers = set()
     loop.worker_rejected_until = {}
     loop._log_state = {}
     loop.project_cursor = 0
@@ -281,10 +282,12 @@ def test_select_worker_reports_busy_unhealthy_rejected_and_unsupported_workers(m
     busy = base.workers[0].model_copy(update={"name": "busy", "task_types": ["reason"]})
     unhealthy = base.workers[0].model_copy(update={"name": "unhealthy", "task_types": ["reason"]})
     rejected = base.workers[0].model_copy(update={"name": "rejected", "task_types": ["reason"]})
+    startup_failed = base.workers[0].model_copy(update={"name": "startup-failed", "task_types": ["reason"]})
     unsupported = base.workers[0].model_copy(update={"name": "unsupported", "task_types": ["explore"]})
-    loop.config = base.model_copy(update={"workers": [busy, unhealthy, rejected, unsupported]})
+    loop.config = base.model_copy(update={"workers": [busy, unhealthy, rejected, startup_failed, unsupported]})
     loop.futures = {Future(): RunningTask("proj", "reason", "busy", TaskCancellation())}
     loop.worker_unhealthy_until = {"unhealthy": 110.0}
+    loop.startup_unhealthy_workers = {"startup-failed"}
     loop.worker_rejected_until = {("proj", "reason", "rejected"): 120.0}
     monkeypatch.setattr("cairn.dispatcher.scheduler.loop.time.time", lambda: 100.0)
 
@@ -293,6 +296,7 @@ def test_select_worker_reports_busy_unhealthy_rejected_and_unsupported_workers(m
     assert selection.worker is None
     assert selection.blocked_busy == ["busy(1/1)"]
     assert selection.blocked_unhealthy == ["unhealthy(10.0s)"]
+    assert selection.blocked_startup_unhealthy == ["startup-failed"]
     assert selection.blocked_rejected == ["rejected(20.0s)"]
     assert selection.blocked_task_type == ["unsupported"]
 

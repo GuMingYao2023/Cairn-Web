@@ -1009,13 +1009,13 @@
         <template x-if="workers.length === 0">
           <div class="flex-1 flex flex-col items-center justify-center text-slate-400 py-16">
             <p class="text-sm text-slate-500">No workers configured yet.</p>
-            <p class="text-xs mt-1">Add one to get started, or edit your dispatch.yaml directly.</p>
+            <p class="text-xs mt-1">Add one to manage workers from the UI. Enabled workers are available to the dispatcher.</p>
           </div>
         </template>
         <template x-if="workers.length > 0">
           <div class="flex-1 overflow-y-auto space-y-2 pr-1">
             <template x-for="w in workers" :key="w.id">
-              <div class="border border-slate-200 rounded-xl p-4">
+              <div class="border border-slate-200 rounded-xl p-4" :class="w.enabled === false ? 'opacity-70 bg-slate-50/60' : ''">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2 mb-1">
@@ -1023,6 +1023,9 @@
                       <span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium uppercase tracking-wider"
                         :class="w.type === 'claudecode' ? 'bg-indigo-50 text-indigo-600' : w.type === 'codex' ? 'bg-emerald-50 text-emerald-600' : w.type === 'pi' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'"
                         x-text="w.type"></span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium uppercase tracking-wider"
+                        :class="w.enabled === false ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-600'"
+                        x-text="w.enabled === false ? 'Disabled' : 'Enabled'"></span>
                     </div>
                     <div class="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
                       <span x-text="'Tasks: ' + (w.task_types || []).join(', ')"></span>
@@ -1033,6 +1036,11 @@
                     </div>
                   </div>
                   <div class="flex items-center gap-1 shrink-0">
+                    <button @click="toggleWorkerEnabled(w)" :title="w.enabled === false ? 'Enable Worker' : 'Disable Worker'"
+                      class="h-7 px-2 rounded-lg border border-slate-200 text-xs transition"
+                      :class="w.enabled === false ? 'text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'">
+                      <span x-text="w.enabled === false ? 'Enable' : 'Disable'"></span>
+                    </button>
                     <button @click="openEditWorker(w)" class="h-7 px-2 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition">
                       <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M16.862 3.487a2.25 2.25 0 1 1 3.182 3.182L7.5 19.313l-4.5.688.687-4.5L16.862 3.487z"/></svg>
                     </button>
@@ -3635,7 +3643,7 @@ function cairnApp() {
     openAddWorker() {
       this.isEditingWorker = false;
       this.editingWorkerId = null;
-      this.workerForm = { name: '', type: 'claudecode', task_types: ['explore'], max_running: 1, priority: 0, env: {} };
+      this.workerForm = { name: '', type: 'claudecode', task_types: ['explore'], max_running: 1, priority: 0, enabled: true, env: {} };
       this.showWorkerForm = true;
       this.testConnectionResult = null;
     },
@@ -3649,6 +3657,7 @@ function cairnApp() {
         task_types: [...(w.task_types || [])],
         max_running: w.max_running,
         priority: w.priority,
+        enabled: w.enabled !== false,
         env: { ...(w.env || {}) },
       };
       this.showWorkerForm = true;
@@ -3707,6 +3716,7 @@ function cairnApp() {
           max_running: this.workerForm.max_running || 1,
           priority: this.workerForm.priority || 0,
           env: this.workerForm.env,
+          enabled: this.workerForm.enabled !== false,
         };
         if (this.isEditingWorker) {
           await this.api('PUT', '/workers/' + this.editingWorkerId, payload);
@@ -3716,6 +3726,15 @@ function cairnApp() {
           this.showToast('Worker created', 'info');
         }
         this.closeWorkerForm();
+        await this.loadWorkers();
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async toggleWorkerEnabled(w) {
+      const enabled = w.enabled === false;
+      try {
+        await this.api('PUT', '/workers/' + w.id + '/enabled', { enabled });
+        this.showToast(enabled ? 'Worker enabled' : 'Worker disabled', 'info');
         await this.loadWorkers();
       } catch(e) { this.showToast(e.message, 'error'); }
     },

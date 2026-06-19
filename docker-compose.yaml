@@ -31,6 +31,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dispatch.yaml:/cairn/dispatch.yaml
+      - ./datas/cairn/:/root/.local/share/cairn/
     env_file:
       - .env
     environment:

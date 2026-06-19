@@ -5,13 +5,82 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from cairn.dispatcher.config import DispatchConfig, WorkerConfig, validate_prompt_resources
+from cairn.dispatcher.config import DispatchConfig, WorkerConfig, load_runtime_dispatch_config, validate_prompt_resources
 from cairn.dispatcher.workers.adapters.codex import CodexDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
+from cairn.server import db
 
 from conftest import make_config
 
 
+def _write_config(path, config: DispatchConfig) -> None:
+    path.write_text(json.dumps(config.model_dump(mode="json")), encoding="utf-8")
+
+
+def _insert_mock_worker(name: str, *, enabled: bool = True, task_types: list[str] | None = None, env: dict[str, str] | None = None) -> None:
+    with db.get_conn() as conn:
+        conn.execute(
+            """INSERT INTO workers (id, name, type, task_types, max_running, priority, enabled, env, created_at, updated_at)
+               VALUES (?, ?, 'mock', ?, 1, 0, ?, ?, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')""",
+            (
+                f"worker-{name}",
+                name,
+                json.dumps(task_types or ["reason"]),
+                int(enabled),
+                json.dumps(env or {}),
+            ),
+        )
+
+
+def test_runtime_dispatch_config_uses_yaml_workers_when_db_is_empty(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(db, "_db_path", None)
+    db.configure(tmp_path / "cairn.db")
+    config_path = tmp_path / "dispatch.json"
+    _write_config(config_path, make_config())
+
+    config = load_runtime_dispatch_config(config_path)
+
+    assert [worker.name for worker in config.workers] == ["test-worker"]
+
+
+def test_runtime_dispatch_config_uses_only_enabled_db_workers(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(db, "_db_path", None)
+    db.configure(tmp_path / "cairn.db")
+    config_path = tmp_path / "dispatch.json"
+    _write_config(config_path, make_config())
+    _insert_mock_worker("enabled", enabled=True)
+    _insert_mock_worker("disabled", enabled=False)
+
+    config = load_runtime_dispatch_config(config_path)
+
+    assert [worker.name for worker in config.workers] == ["enabled"]
+
+
+def test_runtime_dispatch_config_does_not_fall_back_when_all_db_workers_disabled(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(db, "_db_path", None)
+    db.configure(tmp_path / "cairn.db")
+    config_path = tmp_path / "dispatch.json"
+    _write_config(config_path, make_config())
+    _insert_mock_worker("disabled", enabled=False)
+
+    config = load_runtime_dispatch_config(config_path)
+
+    assert config.workers == []
+
+
+def test_runtime_dispatch_config_validates_db_workers(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(db, "_db_path", None)
+    db.configure(tmp_path / "cairn.db")
+    config_path = tmp_path / "dispatch.json"
+    _write_config(config_path, make_config())
+    with db.get_conn() as conn:
+        conn.execute(
+            """INSERT INTO workers (id, name, type, task_types, max_running, priority, enabled, env, created_at, updated_at)
+               VALUES ('worker-bad', 'bad', 'claudecode', '[\"reason\"]', 1, 0, 1, '{}', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"""
+        )
+
+    with pytest.raises(ValidationError, match="missing env keys"):
+        load_runtime_dispatch_config(config_path)
 def test_dispatch_config_merges_common_env_with_worker_override() -> None:
     payload = make_config().model_dump()
     payload["common_env"] = {"SHARED": "common", "OVERRIDE": "common"}

@@ -68,3 +68,20 @@ def test_configure_maps_disabled_bootstrap_mode_to_false(tmp_path, monkeypatch) 
         ("proj_001", 0),
         ("proj_002", 1),
     ]
+
+
+def test_configure_adds_enabled_to_legacy_workers_table(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "legacy-workers.db"
+    with sqlite3.connect(path) as conn:
+        conn.executescript(db.SCHEMA.replace("enabled INTEGER NOT NULL DEFAULT 1,\n", ""))
+        conn.execute(
+            """INSERT INTO workers (id, name, type, task_types, max_running, priority, env, created_at, updated_at)
+               VALUES ('w001', 'legacy', 'mock', '[\"reason\"]', 1, 0, '{}', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"""
+        )
+
+    monkeypatch.setattr(db, "_db_path", None)
+    db.configure(path)
+
+    with db.get_conn() as conn:
+        row = conn.execute("SELECT enabled FROM workers WHERE id = 'w001'").fetchone()
+    assert row["enabled"] == 1

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import requests
 
-from cairn.dispatcher.config import DispatchConfig, WorkerConfig
+from cairn.dispatcher.config import WorkerConfig, load_runtime_dispatch_config
 from cairn.dispatcher.models import ReasonCheckpoint, RunningTask
 from cairn.dispatcher.protocol.client import CairnClient
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
@@ -32,6 +32,7 @@ class WorkerSelection:
     worker: WorkerConfig | None
     blocked_busy: list[str]
     blocked_unhealthy: list[str]
+    blocked_startup_unhealthy: list[str]
     blocked_rejected: list[str]
     blocked_task_type: list[str]
 
@@ -39,7 +40,7 @@ class WorkerSelection:
 class DispatcherLoop:
     def __init__(self, config_path: Path):
         self.config_path = config_path
-        self.config = DispatchConfig.load(config_path)
+        self.config = load_runtime_dispatch_config(config_path)
         self.client = CairnClient(self.config.server)
         self.container_manager = ContainerManager(self.config.container)
         self.executor = ThreadPoolExecutor(max_workers=self.config.runtime.max_workers)
@@ -49,6 +50,7 @@ class DispatcherLoop:
         self.reason_checkpoints: dict[str, ReasonCheckpoint] = {}
         self.runtime_project_ids: set[str] = set()
         self.worker_unhealthy_until: dict[str, float] = {}
+        self.startup_unhealthy_workers: set[str] = set()
         self.worker_rejected_until: dict[tuple[str, str, str], float] = {}
         self._log_state: dict[str, tuple[int, str, tuple[object, ...]]] = {}
         self._cleanup_pending: set[str] = set()
@@ -299,10 +301,11 @@ class DispatcherLoop:
             self._log_changed(
                 f"project:{project.project.id}:worker:reason",
                 logging.INFO,
-                "no worker available for reason project=%s blocked_busy=%s blocked_unhealthy=%s blocked_rejected=%s",
+                "no worker available for reason project=%s blocked_busy=%s blocked_unhealthy=%s blocked_startup_unhealthy=%s blocked_rejected=%s",
                 project.project.id,
                 selection.blocked_busy,
                 selection.blocked_unhealthy,
+                selection.blocked_startup_unhealthy,
                 selection.blocked_rejected,
             )
             return False
@@ -363,11 +366,12 @@ class DispatcherLoop:
             self._log_changed(
                 f"project:{project.project.id}:worker:bootstrap",
                 logging.INFO,
-                "no worker available for bootstrap project=%s intent=%s blocked_busy=%s blocked_unhealthy=%s blocked_rejected=%s",
+                "no worker available for bootstrap project=%s intent=%s blocked_busy=%s blocked_unhealthy=%s blocked_startup_unhealthy=%s blocked_rejected=%s",
                 project.project.id,
                 intent.id,
                 selection.blocked_busy,
                 selection.blocked_unhealthy,
+                selection.blocked_startup_unhealthy,
                 selection.blocked_rejected,
             )
             return False
@@ -421,11 +425,12 @@ class DispatcherLoop:
             self._log_changed(
                 f"project:{project.project.id}:worker:explore",
                 logging.INFO,
-                "no worker available for explore project=%s intent=%s blocked_busy=%s blocked_unhealthy=%s blocked_rejected=%s",
+                "no worker available for explore project=%s intent=%s blocked_busy=%s blocked_unhealthy=%s blocked_startup_unhealthy=%s blocked_rejected=%s",
                 project.project.id,
                 intent.id,
                 selection.blocked_busy,
                 selection.blocked_unhealthy,
+                selection.blocked_startup_unhealthy,
                 selection.blocked_rejected,
             )
             return False
@@ -478,6 +483,7 @@ class DispatcherLoop:
         candidates: list[WorkerConfig] = []
         blocked_busy: list[str] = []
         blocked_unhealthy: list[str] = []
+        blocked_startup_unhealthy: list[str] = []
         blocked_rejected: list[str] = []
         blocked_task_type: list[str] = []
         running_counts = self._worker_counts()
@@ -493,6 +499,9 @@ class DispatcherLoop:
             if unhealthy_until > now:
                 blocked_unhealthy.append(f"{worker.name}({unhealthy_until - now:.1f}s)")
                 continue
+            if worker.name in self.startup_unhealthy_workers:
+                blocked_startup_unhealthy.append(worker.name)
+                continue
             rejected_until = self.worker_rejected_until.get((project_id, task_type, worker.name), 0)
             if rejected_until > now:
                 blocked_rejected.append(f"{worker.name}({rejected_until - now:.1f}s)")
@@ -500,11 +509,12 @@ class DispatcherLoop:
             candidates.append(worker)
         if not candidates:
             LOG.debug(
-                "worker selection project=%s task=%s no candidates blocked_busy=%s blocked_unhealthy=%s blocked_rejected=%s blocked_task_type=%s",
+                "worker selection project=%s task=%s no candidates blocked_busy=%s blocked_unhealthy=%s blocked_startup_unhealthy=%s blocked_rejected=%s blocked_task_type=%s",
                 project_id,
                 task_type,
                 blocked_busy,
                 blocked_unhealthy,
+                blocked_startup_unhealthy,
                 blocked_rejected,
                 blocked_task_type,
             )
@@ -512,17 +522,19 @@ class DispatcherLoop:
                 worker=None,
                 blocked_busy=blocked_busy,
                 blocked_unhealthy=blocked_unhealthy,
+                blocked_startup_unhealthy=blocked_startup_unhealthy,
                 blocked_rejected=blocked_rejected,
                 blocked_task_type=blocked_task_type,
             )
         ordered = choose_worker(candidates, running_counts)
         LOG.debug(
-            "worker selection project=%s task=%s candidates=%s blocked_busy=%s blocked_unhealthy=%s blocked_rejected=%s blocked_task_type=%s chosen=%s",
+            "worker selection project=%s task=%s candidates=%s blocked_busy=%s blocked_unhealthy=%s blocked_startup_unhealthy=%s blocked_rejected=%s blocked_task_type=%s chosen=%s",
             project_id,
             task_type,
             [f"{worker.name}({running_counts.get(worker.name, 0)}/{worker.max_running},p{worker.priority})" for worker in candidates],
             blocked_busy,
             blocked_unhealthy,
+            blocked_startup_unhealthy,
             blocked_rejected,
             blocked_task_type,
             ordered[0].name if ordered else None,
@@ -531,6 +543,7 @@ class DispatcherLoop:
             worker=ordered[0] if ordered else None,
             blocked_busy=blocked_busy,
             blocked_unhealthy=blocked_unhealthy,
+            blocked_startup_unhealthy=blocked_startup_unhealthy,
             blocked_rejected=blocked_rejected,
             blocked_task_type=blocked_task_type,
         )
@@ -859,6 +872,13 @@ class DispatcherLoop:
 
     def _run_startup_healthchecks(self, *, show_commands: bool) -> None:
         results = run_startup_healthchecks(self.config, self.container_manager, show_commands=show_commands)
+        failed = {result.worker_name for result in results if not result.ok}
+        self.startup_unhealthy_workers = failed
+        if failed:
+            LOG.warning(
+                "startup healthcheck marked workers unavailable failed=%s",
+                sorted(failed),
+            )
         if any(result.ok for result in results):
             return
         raise RuntimeError(format_failure_summary(results))

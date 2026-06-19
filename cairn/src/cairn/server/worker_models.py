@@ -23,6 +23,7 @@ class WorkerOut(BaseModel):
     task_types: list[TaskType]
     max_running: int
     priority: int
+    enabled: bool
     env: dict[str, str]
     created_at: str
     updated_at: str
@@ -34,6 +35,7 @@ class WorkerCreate(BaseModel):
     task_types: list[TaskType]
     max_running: int = Field(default=1, gt=0)
     priority: int = Field(default=0, ge=0)
+    enabled: bool = True
     env: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("task_types")
@@ -59,6 +61,7 @@ class WorkerUpdate(BaseModel):
     task_types: list[TaskType] | None = None
     max_running: int | None = Field(default=None, gt=0)
     priority: int | None = Field(default=None, ge=0)
+    enabled: bool | None = None
     env: dict[str, str] | None = None
 
     @field_validator("task_types")
@@ -70,6 +73,10 @@ class WorkerUpdate(BaseModel):
             if len(set(value)) != len(value):
                 raise ValueError("task_types must be unique")
         return value
+
+
+class WorkerEnabledUpdate(BaseModel):
+    enabled: bool
 
 
 class TestConnectionRequest(BaseModel):

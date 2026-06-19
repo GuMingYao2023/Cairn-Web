@@ -9,6 +9,8 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from cairn.server import db
+
 
 TaskType = Literal["reason", "explore", "bootstrap"]
 WorkerType = Literal["claudecode", "codex", "pi", "mock"]
@@ -254,6 +256,32 @@ class DispatchConfig(BaseModel):
         config = cls.model_validate(data)
         validate_prompt_resources(config.runtime.prompt_group)
         return config
+
+
+def load_runtime_dispatch_config(path: Path) -> DispatchConfig:
+    config = DispatchConfig.load(path)
+    db.configure(db.DEFAULT_DB)
+    with db.get_conn() as conn:
+        rows = conn.execute("SELECT * FROM workers ORDER BY created_at").fetchall()
+
+    if not rows:
+        return config
+
+    workers = [
+        WorkerConfig.model_validate(
+            {
+                "name": row["name"],
+                "type": row["type"],
+                "task_types": json.loads(row["task_types"]),
+                "max_running": row["max_running"],
+                "priority": row["priority"],
+                "env": json.loads(row["env"]),
+            }
+        )
+        for row in rows
+        if row["enabled"]
+    ]
+    return config.model_copy(update={"workers": workers})
 
 
 def _validate_optional_positive_int_env(worker_name: str, env: dict[str, str], key: str) -> None:

@@ -11,6 +11,7 @@ from cairn.server.services import next_worker_id, utcnow
 from cairn.server.worker_models import (
     WORKER_ENV_KEYS,
     WorkerCreate,
+    WorkerEnabledUpdate,
     WorkerOut,
     WorkerUpdate,
     TestConnectionRequest,
@@ -29,6 +30,7 @@ def _worker_from_row(row: dict) -> WorkerOut:
         task_types=json.loads(row["task_types"]),
         max_running=row["max_running"],
         priority=row["priority"],
+        enabled=bool(row["enabled"]),
         env=json.loads(row["env"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -51,8 +53,8 @@ def create_worker(body: WorkerCreate):
         now = utcnow()
         try:
             conn.execute(
-                """INSERT INTO workers (id, name, type, task_types, max_running, priority, env, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO workers (id, name, type, task_types, max_running, priority, enabled, env, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     wid,
                     body.name.strip(),
@@ -60,6 +62,7 @@ def create_worker(body: WorkerCreate):
                     json.dumps(body.task_types),
                     body.max_running,
                     body.priority,
+                    int(body.enabled),
                     json.dumps(body.env),
                     now,
                     now,
@@ -89,6 +92,8 @@ def update_worker(worker_id: str, body: WorkerUpdate):
             updates["max_running"] = body.max_running
         if body.priority is not None:
             updates["priority"] = body.priority
+        if body.enabled is not None:
+            updates["enabled"] = int(body.enabled)
         if body.env is not None:
             updates["env"] = json.dumps(body.env)
 
@@ -109,6 +114,20 @@ def update_worker(worker_id: str, body: WorkerUpdate):
         except sqlite3.IntegrityError:
             raise HTTPException(409, f"Worker name '{updates.get('name', '')}' already exists")
 
+        row = conn.execute("SELECT * FROM workers WHERE id = ?", (worker_id,)).fetchone()
+        return _worker_from_row(row)
+
+
+@router.put("/workers/{worker_id}/enabled", response_model=WorkerOut)
+def update_worker_enabled(worker_id: str, body: WorkerEnabledUpdate):
+    with get_conn() as conn:
+        existing = conn.execute("SELECT * FROM workers WHERE id = ?", (worker_id,)).fetchone()
+        if existing is None:
+            raise HTTPException(404, "Worker not found")
+        conn.execute(
+            "UPDATE workers SET enabled = ?, updated_at = ? WHERE id = ?",
+            (int(body.enabled), utcnow(), worker_id),
+        )
         row = conn.execute("SELECT * FROM workers WHERE id = ?", (worker_id,)).fetchone()
         return _worker_from_row(row)
 

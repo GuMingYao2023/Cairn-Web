@@ -207,3 +207,34 @@ def test_project_creation_rejects_invalid_bootstrap_enabled(client: TestClient) 
     )
 
     assert response.status_code == 422
+
+
+def test_worker_api_defaults_and_toggles_enabled(client: TestClient) -> None:
+    response = client.post(
+        "/workers",
+        json={
+            "name": "mock-worker",
+            "type": "mock",
+            "task_types": ["reason", "explore"],
+            "max_running": 1,
+            "priority": 0,
+            "env": {},
+        },
+    )
+    assert response.status_code == 201
+    worker = response.json()
+    assert worker["enabled"] is True
+
+    workers = client.get("/workers").json()
+    assert workers[0]["enabled"] is True
+
+    response = client.put(f"/workers/{worker['id']}", json={"enabled": False})
+    assert response.status_code == 200
+    assert response.json()["enabled"] is False
+
+    response = client.put(f"/workers/{worker['id']}/enabled", json={"enabled": True})
+    assert response.status_code == 200
+    assert response.json()["enabled"] is True
+
+    response = client.put("/workers/missing/enabled", json={"enabled": False})
+    assert response.status_code == 404
