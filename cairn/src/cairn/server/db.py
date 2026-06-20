@@ -93,6 +93,16 @@ CREATE TABLE IF NOT EXISTS workers (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+INSERT OR IGNORE INTO counters (name, value) VALUES ('report', 0);
 """
 
 

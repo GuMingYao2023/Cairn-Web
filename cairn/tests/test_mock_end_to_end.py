@@ -255,11 +255,14 @@ def _loop(config: DispatchConfig, client: InProcessClient, containers: LocalCont
     loop.reason_checkpoints = {}
     loop.runtime_project_ids = set()
     loop.worker_unhealthy_until = {}
+    loop.startup_unhealthy_workers = set()
     loop.worker_rejected_until = {}
     loop._log_state = {}
     loop._cleanup_pending = set()
     loop._inactive_cleanup_done = {}
     loop.project_cursor = 0
+    loop._settings_checked = False
+    loop._startup_healthchecks_checked = True
     return loop
 
 

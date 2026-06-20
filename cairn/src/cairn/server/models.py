@@ -242,3 +242,18 @@ class ReopenResponse(BaseModel):
     project: ProjectMeta
     fact: Fact
     intent: Intent
+
+
+class ReportListItem(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    created_at: str
+
+
+class ReportOut(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    content: str
+    created_at: str

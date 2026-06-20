@@ -54,6 +54,12 @@ def next_hint_id(conn: sqlite3.Connection, project_id: str) -> str:
     return _next_scoped_id(conn, "hint", "h", project_id)
 
 
+def next_report_id(conn: sqlite3.Connection) -> str:
+    conn.execute("UPDATE counters SET value = value + 1 WHERE name = 'report'")
+    row = conn.execute("SELECT value FROM counters WHERE name = 'report'").fetchone()
+    return f"rpt_{row['value']:03d}"
+
+
 def get_project_or_404(conn: sqlite3.Connection, project_id: str) -> sqlite3.Row:
     row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
     if row is None:

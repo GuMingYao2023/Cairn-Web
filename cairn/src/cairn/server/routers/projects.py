@@ -17,6 +17,7 @@ from cairn.server.models import (
     UpdateProjectTitleRequest,
     UpdateProjectStatusRequest,
 )
+from cairn.server.report_generator import generate_and_save_report
 from cairn.server.services import (
     build_intents,
     check_project_completed,
@@ -286,6 +287,9 @@ def complete_project(project_id: str, body: CompleteRequest):
             """,
             (project_id,),
         )
+
+        # Auto-generate report on project completion
+        generate_and_save_report(conn, project_id)
 
         return Intent(
             id=iid,
