@@ -48,27 +48,7 @@ RUN sudo npm install -g @openai/codex@0.118.0
 RUN sudo npm install -g @anthropic-ai/claude-code@2.1.98
 RUN sudo npm install -g @mariozechner/pi-coding-agent@0.73.0
 
-# ── Phase 2: VNC Remote Desktop for Manual Login ─────────────────────────────
-#  See docs/vnc-remote-desktop.md for full design rationale.
-#  Packages: supervisor (process mgmt), xvfb (virtual framebuffer),
-#            x11vnc (VNC server), novnc + websockify (Web VNC client),
-#            fluxbox (window manager), chromium (desktop browser),
-#            nginx + apache2-utils (HTTP Basic Auth for noVNC web)
-RUN sudo apt update && \
-    sudo apt install -y supervisor xvfb x11vnc novnc websockify fluxbox chromium \
-    nginx apache2-utils && \
-    sudo apt clean && \
-    sudo rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /home/kali/scripts /home/kali/.config/chromium-vnc
-
-# ── Phase 2: Environment variables for VNC ───────────────────────────────────
-ENV DISPLAY=:99
-ENV CHROMIUM_USER_DATA_DIR=/home/kali/.config/chromium-vnc
-ENV CDP_PORT=9222
-ENV NOVNC_PORT=6080
-ENV VNC_USER=gumingyao_sx@qiyi.com
-ENV VNC_PASS=GMY895604@!
+RUN mkdir -p /home/kali/scripts
 
 # ── System cleanup ───────────────────────────────────────────────────────────
 RUN sudo rm -rf /usr/lib/llvm-*/build && \
@@ -89,10 +69,6 @@ COPY ./.agents /home/kali/workspace/.claude
 COPY ./AGENTS.md /home/kali/workspace/AGENTS.md
 COPY ./AGENTS.md /home/kali/workspace/CLAUDE.md
 
-# ── Phase 2: VNC scripts & entrypoint ────────────────────────────────────────
-#  entrypoint.sh starts supervisord (Xvfb → fluxbox → x11vnc → noVNC),
-#  then exec the CMD (sleep infinity) from Cairn Dispatcher.
-#  open-browser.sh launches Chromium on the VNC desktop with CDP enabled.
 COPY ./scripts /home/kali/scripts
 RUN sudo chmod +x /home/kali/scripts/*.sh
 
