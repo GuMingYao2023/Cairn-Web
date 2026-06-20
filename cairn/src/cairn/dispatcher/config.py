@@ -267,21 +267,33 @@ def load_runtime_dispatch_config(path: Path) -> DispatchConfig:
     if not rows:
         return config
 
-    workers = [
-        WorkerConfig.model_validate(
-            {
-                "name": row["name"],
-                "type": row["type"],
-                "task_types": json.loads(row["task_types"]),
-                "max_running": row["max_running"],
-                "priority": row["priority"],
-                "env": json.loads(row["env"]),
-            }
+    # Merge: DB workers override same-name config workers; config-only workers are kept
+    db_workers: list[WorkerConfig] = []
+    db_names: set[str] = set()
+    for row in rows:
+        if not row["enabled"]:
+            continue
+        name = row["name"]
+        db_names.add(name)
+        db_workers.append(
+            WorkerConfig.model_validate(
+                {
+                    "name": name,
+                    "type": row["type"],
+                    "task_types": json.loads(row["task_types"]),
+                    "max_running": row["max_running"],
+                    "priority": row["priority"],
+                    "env": json.loads(row["env"]),
+                }
+            )
         )
-        for row in rows
-        if row["enabled"]
-    ]
-    return config.model_copy(update={"workers": workers})
+
+    # Add config workers that are not in DB
+    for w in config.workers:
+        if w.name not in db_names:
+            db_workers.append(w)
+
+    return config.model_copy(update={"workers": db_workers})
 
 
 def _validate_optional_positive_int_env(worker_name: str, env: dict[str, str], key: str) -> None:
