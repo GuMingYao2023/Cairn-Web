@@ -264,21 +264,18 @@ def load_runtime_dispatch_config(path: Path) -> DispatchConfig:
     with db.get_conn() as conn:
         rows = conn.execute("SELECT * FROM workers ORDER BY created_at").fetchall()
 
-    if not rows:
-        return config
-
-    # Merge: DB workers override same-name config workers; config-only workers are kept
-    db_workers: list[WorkerConfig] = []
-    db_names: set[str] = set()
+    # Build enabled workers from DB. When one or more DB workers are
+    # enabled the UI takes full control — config-file workers are ignored
+    # so that disabling / deleting the last DB worker reliably restores
+    # the YAML defaults.
+    db_enabled: list[WorkerConfig] = []
     for row in rows:
         if not row["enabled"]:
             continue
-        name = row["name"]
-        db_names.add(name)
-        db_workers.append(
+        db_enabled.append(
             WorkerConfig.model_validate(
                 {
-                    "name": name,
+                    "name": row["name"],
                     "type": row["type"],
                     "task_types": json.loads(row["task_types"]),
                     "max_running": row["max_running"],
@@ -288,12 +285,11 @@ def load_runtime_dispatch_config(path: Path) -> DispatchConfig:
             )
         )
 
-    # Add config workers that are not in DB
-    for w in config.workers:
-        if w.name not in db_names:
-            db_workers.append(w)
+    if db_enabled:
+        return config.model_copy(update={"workers": db_enabled})
 
-    return config.model_copy(update={"workers": db_workers})
+    # No enabled DB workers — fall back to config-file workers.
+    return config
 
 
 def _validate_optional_positive_int_env(worker_name: str, env: dict[str, str], key: str) -> None:

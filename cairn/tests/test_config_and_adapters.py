@@ -43,8 +43,8 @@ def test_runtime_dispatch_config_uses_yaml_workers_when_db_is_empty(tmp_path, mo
     assert [worker.name for worker in config.workers] == ["test-worker"]
 
 
-def test_runtime_dispatch_config_merges_db_and_config_workers(tmp_path, monkeypatch) -> None:
-    """DB enabled workers override same-name config workers; config-only workers are kept."""
+def test_runtime_dispatch_config_db_workers_replace_config_workers(tmp_path, monkeypatch) -> None:
+    """When DB has enabled workers, config-file workers are ignored entirely."""
     monkeypatch.setattr(db, "_db_path", None)
     db.configure(tmp_path / "cairn.db")
     config_path = tmp_path / "dispatch.json"
@@ -54,11 +54,8 @@ def test_runtime_dispatch_config_merges_db_and_config_workers(tmp_path, monkeypa
 
     config = load_runtime_dispatch_config(config_path)
 
-    # "enabled" from DB + "test-worker" from config (not in DB)
-    names = {worker.name for worker in config.workers}
-    assert "enabled" in names
-    assert "test-worker" in names
-    assert "disabled" not in names
+    # Only DB-enabled workers — config worker "test-worker" is NOT kept
+    assert [worker.name for worker in config.workers] == ["enabled"]
 
 
 def test_runtime_dispatch_config_falls_back_to_config_when_db_workers_disabled(tmp_path, monkeypatch) -> None:

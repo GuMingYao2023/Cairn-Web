@@ -79,6 +79,7 @@ class DispatcherLoop:
                     if not self._settings_checked:
                         self._validate_server_settings()
                         self._settings_checked = True
+                    self._reload_workers()
                     self._reap_futures()
                     self._reap_cleanup_futures()
                     summaries = self.client.list_projects()
@@ -547,6 +548,13 @@ class DispatcherLoop:
             blocked_rejected=blocked_rejected,
             blocked_task_type=blocked_task_type,
         )
+
+    def _reload_workers(self) -> None:
+        """Reload workers from DB so UI changes take effect without a restart."""
+        try:
+            self.config = load_runtime_dispatch_config(self.config_path)
+        except Exception:
+            LOG.warning("failed to reload workers; keeping previous config", exc_info=True)
 
     def _worker_counts(self) -> dict[str, int]:
         counts: dict[str, int] = {}
