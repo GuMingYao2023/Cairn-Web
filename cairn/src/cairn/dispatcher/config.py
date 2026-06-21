@@ -155,6 +155,7 @@ class ContainerConfig(BaseModel):
     network_mode: str
     completed_action: CompletedAction
     cap_add: list[str] = Field(default_factory=list)
+    vnc_enabled: bool = False
 
 
 class RuntimeConfig(BaseModel):
@@ -256,6 +257,20 @@ class DispatchConfig(BaseModel):
         config = cls.model_validate(data)
         validate_prompt_resources(config.runtime.prompt_group)
         return config
+
+
+def assign_vnc_ports(project_id: str, base_vnc: int = 5900, base_novnc: int = 6080) -> tuple[int, int]:
+    """Derive stable VNC port pair from project_id hash.
+
+    Uses the first 4 bytes of MD5 mod 100 to produce an offset in [0, 99],
+    giving each project a unique port pair that stays the same across restarts.
+    With the default max of 3 concurrent projects the collision risk is negligible.
+    """
+    import hashlib
+
+    digest = hashlib.md5(project_id.encode()).hexdigest()
+    offset = int(digest[:4], 16) % 100
+    return (base_vnc + offset, base_novnc + offset)
 
 
 def load_runtime_dispatch_config(path: Path) -> DispatchConfig:

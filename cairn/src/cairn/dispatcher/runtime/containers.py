@@ -11,7 +11,7 @@ import docker
 from docker.errors import APIError, DockerException, NotFound
 from docker.models.containers import Container
 
-from cairn.dispatcher.config import ContainerConfig
+from cairn.dispatcher.config import ContainerConfig, assign_vnc_ports
 from cairn.dispatcher.runtime.process import ManagedProcess
 
 LOG = logging.getLogger(__name__)
@@ -49,6 +49,20 @@ class ContainerManager:
             self._start_existing(name)
             return name
         LOG.info("creating container project=%s container=%s image=%s", project_id, name, self._config.image)
+        environment: dict[str, str] | None = None
+        if self._config.vnc_enabled:
+            vnc_port, novnc_port = assign_vnc_ports(project_id)
+            environment = {
+                "NOVNC_PORT": str(novnc_port),
+                "VNC_PORT": str(vnc_port),
+                "DISPLAY": ":99",
+            }
+            LOG.info(
+                "vnc enabled project=%s vnc_port=%s novnc_port=%s",
+                project_id,
+                vnc_port,
+                novnc_port,
+            )
         try:
             self._client.containers.run(
                 self._config.image,
@@ -57,6 +71,7 @@ class ContainerManager:
                 name=name,
                 network_mode=self._config.network_mode,
                 cap_add=self._config.cap_add or None,
+                environment=environment,
             )
             LOG.info("created container project=%s container=%s", project_id, name)
             return name

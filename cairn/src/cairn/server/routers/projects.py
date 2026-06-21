@@ -19,6 +19,7 @@ from cairn.server.models import (
 )
 from cairn.server.report_generator import generate_and_save_report
 from cairn.server.services import (
+    assign_vnc_ports,
     build_intents,
     check_project_completed,
     check_project_active,
@@ -104,6 +105,7 @@ def create_project(body: CreateProjectRequest):
                 )
                 hints.append(Hint(id=hid, content=h.content, creator=h.creator, created_at=now))
 
+        _vnc_port, novnc_port = assign_vnc_ports(pid)
         return ProjectDetail(
             project=ProjectMeta(
                 id=pid,
@@ -119,6 +121,7 @@ def create_project(body: CreateProjectRequest):
             ],
             intents=[],
             hints=hints,
+            vnc_novnc_port=novnc_port,
         )
 
 
@@ -137,11 +140,13 @@ def get_project(project_id: str):
             (project_id,),
         ).fetchall()
 
+        _vnc_port, novnc_port = assign_vnc_ports(project_id)
         return ProjectDetail(
             project=project_meta_from_row(row),
             facts=[Fact(**dict(f)) for f in facts],
             intents=build_intents(conn, project_id),
             hints=[Hint(**dict(h)) for h in hints],
+            vnc_novnc_port=novnc_port,
         )
 
 

@@ -65,6 +65,7 @@ class ProjectDetail(BaseModel):
     facts: list[Fact]
     intents: list[Intent]
     hints: list[Hint]
+    vnc_novnc_port: int | None = None
 
 
 class CreateHintInline(BaseModel):

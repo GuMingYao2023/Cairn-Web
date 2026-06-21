@@ -105,6 +105,18 @@ System architecture:
 
 Supported worker backends: **Claude Code**, **Codex**, and **Pi**.
 
+### VNC Manual Login
+
+When the AI agent encounters a web login page without credentials, instead of failing silently it opens the page on a **VNC remote desktop** inside the worker container and waits for you to log in manually:
+
+1. AI runs `open-browser.sh <URL>` — opens Chromium on the VNC desktop
+2. You connect via `http://<host>:<port>/vnc.html` (port shown in Web UI project detail)
+3. You manually log in — browser cookies/session are persisted in the container
+4. AI detects completion and continues with the authenticated session
+5. AI runs `close-browser.sh` — gracefully shuts down the browser to free resources
+
+The VNC stack (Xvfb + fluxbox + x11vnc + noVNC) starts automatically in every worker container when `vnc_enabled: true` is set in `dispatch.yaml`.
+
 ## Results
 
 **Tencent Cloud Hackathon · AI Penetration Testing Challenge · 2nd Edition**
@@ -137,7 +149,7 @@ Supported worker backends: **Claude Code**, **Codex**, and **Pi**.
 Both setup methods require the worker container image:
  
 ```bash
-docker pull --platform=linux/amd64 ghcr.io/oritera/cairn-worker-container:latest
+docker pull --platform=linux/amd64 ghcr.io/gumingyao2023/cairn-worker-container:latest
 ```
 
 Create your local dispatcher configuration and fill in your LLM endpoints and API keys:
@@ -191,8 +203,8 @@ The developers and contributors of this project do not endorse or accept respons
 
 ## Star History
 
-<a href="https://www.star-history.com/#oritera/Cairn&Date" target="_blank" rel="noopener noreferrer">
-  <img src="https://api.star-history.com/svg?repos=oritera/Cairn&type=Date" alt="Star History Chart" />
+<a href="https://www.star-history.com/#GuMingYao2023/Cairn-Web&Date" target="_blank" rel="noopener noreferrer">
+  <img src="https://api.star-history.com/svg?repos=GuMingYao2023/Cairn-Web&type=Date" alt="Star History Chart" />
 </a>
 
 ## ⚖️ License

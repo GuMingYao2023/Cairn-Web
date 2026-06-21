@@ -17,6 +17,7 @@ Only return the following after you have confirmed that Goal has been satisfied:
 # Rules
 - If the problem is not yet solved, keep working and do not stop on your own.
 - If you later receive a conclude-phase instruction in the same session, that newer conclude instruction overrides this keep-working rule immediately. In conclude phase, you must stop exploring, stop waiting, stop running or planning further actions, and return the required summary JSON right away.
+- **When you encounter a web login page and do not have credentials**: do NOT use playwright-cli. Instead, use `/home/kali/scripts/open-browser.sh <URL>` to open the page on the VNC desktop, write the signal file `/tmp/waiting-login`, poll for `/tmp/login-done` (max 120s), then continue. Always run `/home/kali/scripts/close-browser.sh` afterwards to free resources. If login times out, report it as a fact and continue — do not mark the goal as complete.
 - Output `complete` only if Goal has already been definitively achieved in this session. If Goal is not yet achieved, do not output `complete`, do not summarize partial progress as completion, and keep working until a conclude-phase instruction replaces this task.
 - `fact.description` must clearly state the confirmed key objective results. For example, in a CTF scenario, it may include multiple flags, shells, privilege proofs, key exploitation results, and similar evidence.
 - `complete.description` should explain why the currently confirmed results are sufficient to prove that Goal has been achieved.

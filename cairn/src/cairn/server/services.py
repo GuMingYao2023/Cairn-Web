@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
 from cairn.server.models import Intent, ProjectMeta, ProjectReason
+
+def assign_vnc_ports(project_id: str, base_vnc: int = 5900, base_novnc: int = 6080) -> tuple[int, int]:
+    """Derive stable VNC port pair from project_id hash.
+
+    Uses the first 4 bytes of MD5 mod 100 to produce an offset in [0, 99],
+    giving each project a unique port pair that stays the same across restarts.
+    """
+    digest = hashlib.md5(project_id.encode()).hexdigest()
+    offset = int(digest[:4], 16) % 100
+    return (base_vnc + offset, base_novnc + offset)
+
 
 def utcnow() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

@@ -468,6 +468,15 @@
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M14.25 3H7.5A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V8.25L14.25 3Z"/><path d="M14.25 3v5.25h4.5"/><path d="M8.25 12h7.5M8.25 15h5.25"/></svg>
         Snapshot
       </button>
+      <template x-if="project.vnc_novnc_port">
+        <a :href="'http://' + window.location.hostname + ':' + project.vnc_novnc_port + '/vnc.html'"
+           target="_blank" rel="noopener"
+           class="px-2.5 py-1 rounded-lg border border-sky-200 text-xs text-sky-600 hover:bg-sky-50 transition flex items-center gap-1.5"
+           :title="'VNC Remote Desktop (port ' + project.vnc_novnc_port + ')'">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+          VNC
+        </a>
+      </template>
       <template x-if="!replay.active && project.project.status !== 'completed'">
         <button @click="toggleProjectStop()"
           class="px-2.5 py-1 rounded-lg border text-xs transition flex items-center gap-1.5"
